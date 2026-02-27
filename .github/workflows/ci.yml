@@ -20,14 +20,17 @@ jobs:
       - name: Build
         run: cargo build
 
-      - name: Test
+      - name: Verify benchmarks compile
+        run: cargo bench --no-run
+
+      - name: Test (HTML → PDF)
         run: |
-          ./target/debug/artifact-generator /tmp/test.html --port 13000 &
-          sleep 0.5
           echo "<h1>ci</h1>" > /tmp/test.html
-          sleep 0.2
-          curl -sf http://localhost:13000/content | grep -q "ci"
-          echo "PASS"
+          ./target/debug/artifact-generator /tmp/test.html --output /tmp/test.pdf &
+          PID=$!
+          sleep 5
+          kill $PID 2>/dev/null || true
+          test -s /tmp/test.pdf && echo "PASS: PDF is non-empty" || (echo "FAIL: PDF missing or empty" && exit 1)
 
   python:
     name: Python benchmarks
@@ -41,4 +44,4 @@ jobs:
         run: uv sync --project python
 
       - name: Run offline benchmarks
-        run: uv run --project python python/benchmarks/run.py
+        run: uv run --project python ag-bench
