@@ -15,7 +15,7 @@ demo file="/tmp/artifact.html": build
     ./target/debug/artifact-generator "$FILE" &
     PID=$!
     sleep 0.3
-    uv run --project python ag-demo "$FILE"
+    uv run --project tools ag-demo "$FILE"
     sleep 2  # let final render complete
     kill $PID 2>/dev/null || true
     PDF="${FILE%.html}.pdf"
@@ -29,7 +29,7 @@ demo-llm file="/tmp/artifact.html" model="gemma3": build
     ./target/debug/artifact-generator "$FILE" &
     PID=$!
     sleep 0.3
-    uv run --project python ag-ollama "$FILE" "{{model}}"
+    uv run --project tools ag-ollama "$FILE" "{{model}}"
     sleep 2
     kill $PID 2>/dev/null || true
     PDF="${FILE%.html}.pdf"
@@ -37,7 +37,7 @@ demo-llm file="/tmp/artifact.html" model="gemma3": build
 
 # Offline tokenizer benchmarks — no server needed
 bench:
-    uv run --project python ag-bench
+    uv run --project tools ag-bench
 
 # Rust criterion benchmarks
 bench-rust:
@@ -51,7 +51,7 @@ demo-hf tokenizer="gpt2" file="/tmp/artifact.html": build
     ./target/debug/artifact-generator "$FILE" &
     PID=$!
     sleep 0.3
-    uv run --project python ag-hf-stream "$FILE" "{{tokenizer}}"
+    uv run --project tools ag-hf-stream "$FILE" "{{tokenizer}}"
     sleep 2
     kill $PID 2>/dev/null || true
     PDF="${FILE%.html}.pdf"

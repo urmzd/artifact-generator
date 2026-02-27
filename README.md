@@ -57,6 +57,45 @@ artifact-generator <input.html> [--output output.pdf]
 
 The process runs until interrupted with Ctrl+C.
 
+## Observability
+
+The Rust binary emits structured log lines to stderr via `tracing` and prints a metrics summary on shutdown.
+
+### Structured logging
+
+Logs use `tracing-subscriber` (compact format with timestamps). Control verbosity with the `RUST_LOG` environment variable (default: `artifact_generator=info`).
+
+```sh
+# Show debug-level spans
+RUST_LOG=artifact_generator=debug artifact-generator input.html
+```
+
+### Tracing spans
+
+| Span | Location |
+|---|---|
+| `file_watcher` | File polling loop |
+| `browser_launch` | Headless Chrome startup |
+| `render_cycle` | Full render (navigate + PDF + write) |
+| `navigate_and_load` | Chrome tab navigation |
+| `generate_pdf` | `print_to_pdf` call |
+| `write_pdf` | PDF file write |
+
+### Metrics summary
+
+On Ctrl+C the binary prints a summary table to stderr:
+
+```
+── Metrics Summary ───────────────────────────────────
+render.count                  5
+render.duration_ms            avg=245.3      min=120.1      max=450.7
+render.pdf_size_bytes         avg=83412      min=81000      max=86200
+watcher.changes_detected      5
+watcher.poll_duration_ms      avg=0.1        min=0.0        max=0.3
+broadcast.lag_count           0
+───────────────────────────────────────────────────────
+```
+
 ## Recipes
 
 | Recipe | Description |
@@ -70,9 +109,9 @@ The process runs until interrupted with Ctrl+C.
 | `just bench-rust` | Rust criterion benchmarks (watcher, broadcast) |
 | `just test` | Smoke test: verify PDF output is produced |
 
-## Python package
+## Tools package
 
-The Python scripts live under `python/` and are structured as a proper package (`artifact_generator`) with console entry points:
+The Python scripts live under `tools/` and are structured as a proper package (`artifact_generator`) with console entry points:
 
 | Entry point | Description |
 |---|---|
@@ -86,7 +125,7 @@ The Python scripts live under `python/` and are structured as a proper package (
 Install and run any entry point with:
 
 ```sh
-uv run --project python ag-bench
+uv run --project tools ag-bench
 ```
 
 ## Benchmark output (example)

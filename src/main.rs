@@ -2,11 +2,15 @@ use std::path::PathBuf;
 use std::sync::mpsc;
 use std::time::Duration;
 
+use artifact_generator::telemetry;
 use artifact_generator::{spawn_file_watcher, spawn_render_thread, RenderMsg};
 use tokio::sync::broadcast;
+use tracing::{info, warn};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    let guard = telemetry::init();
+
     let args: Vec<String> = std::env::args().collect();
 
     if args.len() < 2 {
@@ -29,8 +33,7 @@ async fn main() -> anyhow::Result<()> {
 
     let pdf_path = pdf_path.unwrap_or_else(|| html_path.with_extension("pdf"));
 
-    eprintln!("Watching: {}", html_path.display());
-    eprintln!("Output:   {}", pdf_path.display());
+    info!(html = %html_path.display(), pdf = %pdf_path.display(), "watching");
 
     // Broadcast channel for file watcher -> main loop
     let (tx, mut rx) = broadcast::channel::<String>(16);
@@ -39,6 +42,8 @@ async fn main() -> anyhow::Result<()> {
     // mpsc channel for main loop -> render thread
     let (render_tx, render_rx) = mpsc::channel::<RenderMsg>();
     let render_handle = spawn_render_thread(render_rx, html_path.clone(), pdf_path.clone());
+
+    let metrics = telemetry::Metrics::get();
 
     // Main loop: forward broadcast events to the render thread
     let forward = tokio::spawn(async move {
@@ -50,7 +55,10 @@ async fn main() -> anyhow::Result<()> {
                     }
                 }
                 Err(broadcast::error::RecvError::Lagged(n)) => {
-                    eprintln!("watcher lagged by {n} messages, rendering latest");
+                    warn!(lagged = n, "watcher lagged, rendering latest");
+                    metrics
+                        .broadcast_lag_count
+                        .fetch_add(n, std::sync::atomic::Ordering::Relaxed);
                     if render_tx.send(RenderMsg::Trigger).is_err() {
                         break;
                     }
@@ -62,12 +70,12 @@ async fn main() -> anyhow::Result<()> {
 
     // Wait for Ctrl+C
     tokio::signal::ctrl_c().await?;
-    eprintln!("\nShutting down...");
+    info!("shutting down");
 
-    // Aborting the forward task drops render_tx, which closes the mpsc channel.
-    // The render thread's `for msg in rx` loop then exits naturally.
     forward.abort();
     let _ = render_handle.join();
+
+    guard.shutdown();
 
     Ok(())
 }
