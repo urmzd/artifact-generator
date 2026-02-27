@@ -1,36 +1,39 @@
-#!/usr/bin/env python3
 """
-Sanity / perf test — streams a large pre-built HTML dashboard to the watched
-file without any external dependencies.
-
-Usage: python3 python/massive.py [output-path]
+HTML corpus generator for benchmarking — builds a large self-contained dashboard.
 """
-import sys, time, random, string, urllib.request
+import random
+import string
 
-PATH = sys.argv[1] if len(sys.argv) > 1 else "/tmp/artifact.html"
-PORT = sys.argv[2] if len(sys.argv) > 2 else None
-
-CHUNK_SIZE = 30   # chars per flush
+CHUNK_SIZE = 30  # chars per flush
 
 # ── fake data generators ──────────────────────────────────────────────────────
 
-FIRST = ["Alice","Bob","Carol","Dave","Eve","Frank","Grace","Hank","Iris","Jack",
-         "Karen","Leo","Mia","Ned","Olivia","Paul","Quinn","Rita","Sam","Tina",
-         "Uma","Victor","Wendy","Xander","Yara","Zoe","Aaron","Beth","Caleb","Diana"]
-LAST  = ["Smith","Johnson","Williams","Brown","Jones","Garcia","Miller","Davis",
-         "Wilson","Taylor","Anderson","Thomas","Jackson","White","Harris","Martin",
-         "Thompson","Moore","Young","Allen","King","Wright","Scott","Hill","Green"]
-ROLES    = ["Admin","Editor","Viewer","Manager","Developer","Support"]
-STATUSES = ["Active","Inactive","Pending","Suspended"]
-PRODUCTS = ["Widget Pro","Gadget Plus","Doohickey Max","Thingamajig Lite",
-            "Whatsit Premium","Gizmo Basic","Contraption Ultra","Doodad Standard"]
-ORDER_ST = ["Shipped","Processing","Delivered","Cancelled","Refunded"]
+FIRST = [
+    "Alice", "Bob", "Carol", "Dave", "Eve", "Frank", "Grace", "Hank", "Iris", "Jack",
+    "Karen", "Leo", "Mia", "Ned", "Olivia", "Paul", "Quinn", "Rita", "Sam", "Tina",
+    "Uma", "Victor", "Wendy", "Xander", "Yara", "Zoe", "Aaron", "Beth", "Caleb", "Diana",
+]
+LAST = [
+    "Smith", "Johnson", "Williams", "Brown", "Jones", "Garcia", "Miller", "Davis",
+    "Wilson", "Taylor", "Anderson", "Thomas", "Jackson", "White", "Harris", "Martin",
+    "Thompson", "Moore", "Young", "Allen", "King", "Wright", "Scott", "Hill", "Green",
+]
+ROLES = ["Admin", "Editor", "Viewer", "Manager", "Developer", "Support"]
+STATUSES = ["Active", "Inactive", "Pending", "Suspended"]
+PRODUCTS = [
+    "Widget Pro", "Gadget Plus", "Doohickey Max", "Thingamajig Lite",
+    "Whatsit Premium", "Gizmo Basic", "Contraption Ultra", "Doodad Standard",
+]
+ORDER_ST = ["Shipped", "Processing", "Delivered", "Cancelled", "Refunded"]
+
 
 def rname():
     return f"{random.choice(FIRST)} {random.choice(LAST)}"
 
+
 def remail(name):
-    return f"{name.lower().replace(' ','.')}{random.randint(1,99)}@example.com"
+    return f"{name.lower().replace(' ', '.')}{random.randint(1, 99)}@example.com"
+
 
 def rdate(y0=2020, y1=2025):
     y = random.randint(y0, y1)
@@ -38,23 +41,30 @@ def rdate(y0=2020, y1=2025):
     d = random.randint(1, 28)
     return f"{y}-{m:02d}-{d:02d}"
 
+
 def rid():
     return "ORD-" + "".join(random.choices(string.digits, k=6))
 
+
 # ── HTML builder ─────────────────────────────────────────────────────────────
+
 
 def build_html():
     random.seed(42)
 
     user_rows = []
     for i in range(150):
-        name   = rname()
-        email  = remail(name)
-        role   = random.choice(ROLES)
+        name = rname()
+        email = remail(name)
+        role = random.choice(ROLES)
         status = random.choice(STATUSES)
         joined = rdate()
-        color  = {"Active":"#22c55e","Inactive":"#94a3b8",
-                  "Pending":"#f59e0b","Suspended":"#ef4444"}[status]
+        color = {
+            "Active": "#22c55e",
+            "Inactive": "#94a3b8",
+            "Pending": "#f59e0b",
+            "Suspended": "#ef4444",
+        }[status]
         user_rows.append(
             f'<tr><td>{i+1}</td><td>{name}</td><td>{email}</td>'
             f'<td>{role}</td>'
@@ -65,13 +75,18 @@ def build_html():
 
     order_rows = []
     for i in range(100):
-        oid    = rid()
-        prod   = random.choice(PRODUCTS)
-        amt    = f"${random.uniform(9.99, 999.99):.2f}"
-        date   = rdate(2024, 2025)
+        oid = rid()
+        prod = random.choice(PRODUCTS)
+        amt = f"${random.uniform(9.99, 999.99):.2f}"
+        date = rdate(2024, 2025)
         status = random.choice(ORDER_ST)
-        color  = {"Shipped":"#3b82f6","Processing":"#f59e0b","Delivered":"#22c55e",
-                  "Cancelled":"#ef4444","Refunded":"#8b5cf6"}[status]
+        color = {
+            "Shipped": "#3b82f6",
+            "Processing": "#f59e0b",
+            "Delivered": "#22c55e",
+            "Cancelled": "#ef4444",
+            "Refunded": "#8b5cf6",
+        }[status]
         order_rows.append(
             f'<tr><td>{oid}</td><td>{prod}</td><td>{amt}</td><td>{date}</td>'
             f'<td><span style="background:{color};color:#fff;padding:2px 8px;'
@@ -279,38 +294,3 @@ input:checked+.slider:before{{transform:translateX(20px)}}
 </div>
 </body>
 </html>"""
-
-# ── stream ────────────────────────────────────────────────────────────────────
-
-def main():
-    html    = build_html()
-    total   = len(html)
-    flushes = 0
-    t0      = time.perf_counter()
-
-    print(f"Streaming {total:,} bytes to {PATH}  (chunk={CHUNK_SIZE} chars, no delay)")
-
-    with open(PATH, "w") as f:
-        for i in range(0, total, CHUNK_SIZE):
-            f.write(html[i:i + CHUNK_SIZE])
-            f.flush()
-            flushes += 1
-
-    elapsed = time.perf_counter() - t0
-    kb      = total / 1024
-    kbps    = kb / elapsed if elapsed > 0 else 0
-    sse_est = max(1, int(elapsed / 0.1))
-
-    print(f"\n{'─'*44}")
-    print(f"  Bytes written : {total:>10,}")
-    print(f"  Elapsed       : {elapsed:>10.2f} s")
-    print(f"  Throughput    : {kbps:>10.1f} KB/s")
-    print(f"  Flushes       : {flushes:>10,}")
-    print(f"  SSE updates ~ : {sse_est:>10,}")
-    print(f"{'─'*44}")
-
-    if PORT:
-        urllib.request.urlopen(f"http://localhost:{PORT}/done", data=b"")
-
-if __name__ == "__main__":
-    main()
