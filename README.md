@@ -1,33 +1,33 @@
 # artifact-generator
 
-A lightweight local dev tool that watches a file and live-previews it in a browser via Server-Sent Events (SSE). Designed for streaming HTML artifacts token-by-token — useful for benchmarking tokenizers, LLM streaming, and any chunked-write workflow.
+A local dev tool that watches an HTML file on disk and continuously renders it to PDF using headless Chrome. Designed for streaming HTML artifacts token-by-token — useful for benchmarking tokenizers, LLM streaming, and any chunked-write workflow.
 
 ## How it works
 
-1. The Rust server watches a file on disk (polling every 100 ms).
-2. On every change it broadcasts the full file contents over SSE.
-3. The browser shell receives updates and re-renders them inside an `<iframe>` — no page reload needed.
-4. When the writer calls `POST /done`, the browser tab closes automatically.
+1. The Rust binary watches a file on disk (polling every 100 ms).
+2. On every change it renders the HTML to PDF via headless Chrome.
+3. The PDF is overwritten in place on each render cycle.
 
 ```
-writer (Python) ──writes──▶ file ──SSE──▶ browser iframe
-                                  ▲
-                          artifact-generator (Rust/axum)
+writer (Python) ──writes──▶ file.html ──render──▶ file.pdf
+                                        ▲
+                              artifact-generator (Rust + headless Chrome)
 ```
 
 ## Requirements
 
 - [Rust](https://rustup.rs/) (stable)
+- [Google Chrome](https://www.google.com/chrome/) or Chromium (headless rendering)
 - [uv](https://github.com/astral-sh/uv) (Python package manager)
 - [just](https://github.com/casey/just) (optional, for recipes)
 
 ## Quick start
 
 ```sh
-# Build the server
+# Build the binary
 just build
 
-# Stream a pre-built HTML dashboard (no external deps)
+# Stream a pre-built HTML dashboard and produce a PDF
 just demo
 
 # Stream via a real LLM (requires ollama)
@@ -41,38 +41,53 @@ just demo-hf tokenizer=bert-base-uncased
 
 # Run offline tokenizer benchmarks (no server needed)
 just bench
+
+# Run Rust criterion benchmarks (file watcher, broadcast throughput)
+just bench-rust
 ```
+
+## CLI usage
+
+```sh
+artifact-generator <input.html> [--output output.pdf]
+```
+
+- `<input.html>` — the HTML file to watch.
+- `--output` — optional PDF output path (defaults to `<input>.pdf`).
+
+The process runs until interrupted with Ctrl+C.
 
 ## Recipes
 
 | Recipe | Description |
 |---|---|
-| `just build` | Compile the Rust server |
-| `just demo` | Fixed 30-char chunk streaming, opens browser |
-| `just demo-llm` | Live ollama LLM streaming |
+| `just build` | Compile the Rust binary |
+| `just install` | Install the binary via `cargo install` |
+| `just demo` | Stream a pre-built HTML dashboard, produce PDF |
+| `just demo-llm [model]` | Live ollama LLM streaming (default: gemma3) |
 | `just demo-hf [tokenizer]` | HuggingFace tokenizer streaming |
-| `just bench` | Offline benchmark table: gpt2 vs BERT vs fixed chunks |
-| `just test` | Smoke test the server `/content` endpoint |
+| `just bench` | Offline Python tokenizer benchmarks |
+| `just bench-rust` | Rust criterion benchmarks (watcher, broadcast) |
+| `just test` | Smoke test: verify PDF output is produced |
 
-## HTTP API
+## Python package
 
-| Method | Path | Description |
-|---|---|---|
-| `GET` | `/` | Browser shell (SSE client) |
-| `GET` | `/events` | SSE stream of file contents |
-| `GET` | `/content` | Current file contents (plain text) |
-| `POST` | `/done` | Signal completion; closes the browser tab |
+The Python scripts live under `python/` and are structured as a proper package (`artifact_generator`) with console entry points:
 
-## Python scripts
-
-All scripts live under `python/` and share zero dependencies except where noted.
-
-| Script | Purpose |
+| Entry point | Description |
 |---|---|
-| `python/massive.py` | Generates + streams a large dashboard HTML in 30-char fixed chunks |
-| `python/ollama_stream.py` | Streams a live LLM response via ollama |
-| `python/benchmarks/hf_stream.py` | Streams via a HuggingFace tokenizer (`tokenizers` package only — no model weights) |
-| `python/benchmarks/run.py` | Offline benchmark: tokenize time, token count, streaming throughput |
+| `ag-demo` | Stream a pre-built HTML dashboard in fixed chunks |
+| `ag-ollama` | Stream a live LLM response via ollama |
+| `ag-stream` | Generic file streaming utility |
+| `ag-hf-stream` | Stream via a HuggingFace tokenizer |
+| `ag-bench` | Offline benchmark: tokenize time, token count, throughput |
+| `ag-realtime` | Real-time streaming dashboard |
+
+Install and run any entry point with:
+
+```sh
+uv run --project python ag-bench
+```
 
 ## Benchmark output (example)
 
