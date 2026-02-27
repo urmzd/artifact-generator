@@ -3,14 +3,24 @@ name = "artifact-generator"
 version = "0.1.0"
 edition = "2021"
 
+[lib]
+name = "artifact_generator"
+path = "src/lib.rs"
+
 [[bin]]
 name = "artifact-generator"
 path = "src/main.rs"
 
 [dependencies]
-axum          = "0.8"
+headless_chrome = "1"
 tokio         = { version = "1", features = ["full"] }
-tower-http    = { version = "0.6", features = ["cors"] }
 tokio-stream  = { version = "0.1", features = ["sync"] }
-serde_json    = "1"
 anyhow        = "1"
+
+[dev-dependencies]
+criterion = { version = "0.5", features = ["async_tokio"] }
+tempfile = "3"
+
+[[bench]]
+name = "watcher"
+harness = false
