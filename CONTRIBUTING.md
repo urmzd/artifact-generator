@@ -5,7 +5,7 @@ Contributions are welcome. Please follow these guidelines.
 ## Getting started
 
 ```sh
-git clone <repo-url>
+git clone https://github.com/urmzd/artifact-generator
 cd artifact-generator
 just build   # compile the Rust server
 just test    # run the smoke test
